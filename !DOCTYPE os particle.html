@@ -1,0 +1,1773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Gesture Controlled 3D Particles</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; transition: background-color 1s ease; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        #video-input { position: absolute; top: 10px; left: 10px; width: 160px; height: 120px; transform: scaleX(-1); opacity: 0.5; z-index: 2; border: 2px solid #333; border-radius: 8px; }
+        #ui { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); color: white; text-align: center; z-index: 3; pointer-events: none; }
+        h1 { margin: 0; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,255,255,0.5); }
+        p { font-size: 0.9rem; color: #aaa; margin-top: 5px; }
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 1.5rem; z-index: 10; }
+        .hidden { display: none; }
+        /* Menu Styles */
+        #menu { 
+            position: absolute; 
+            top: 10px; 
+            right: 10px; 
+            background: rgba(0, 0, 0, 0.8); 
+            border: 2px solid rgba(255, 192, 203, 0.5); 
+            border-radius: 12px; 
+            padding: 15px; 
+            z-index: 100; 
+            color: white; 
+            font-size: 0.85rem;
+            min-width: 200px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(255, 192, 203, 0.3);
+        }
+        #menu h3 { 
+            margin: 0 0 10px 0; 
+            color: #ffb6c1; 
+            text-align: center;
+            font-size: 1rem;
+        }
+        .menu-section { 
+            margin: 10px 0; 
+            padding: 8px;
+            border-top: 1px solid rgba(255, 192, 203, 0.2);
+        }
+        .menu-section:first-child { border-top: none; }
+        .menu-label { 
+            display: block; 
+            margin-bottom: 5px; 
+            color: #ffb6c1; 
+            font-size: 0.8rem;
+        }
+        .menu-control { 
+            width: 100%; 
+            margin-bottom: 8px;
+        }
+        .menu-button { 
+            background: linear-gradient(135deg, #ff6b9d, #c44569); 
+            border: none; 
+            color: white; 
+            padding: 8px 15px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            width: 100%; 
+            margin: 3px 0;
+            transition: all 0.3s;
+            font-size: 0.85rem;
+        }
+        .menu-button:hover { 
+            background: linear-gradient(135deg, #ff8fab, #d45a7f); 
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 107, 157, 0.5);
+        }
+        .menu-toggle { 
+            position: absolute; 
+            top: 10px; 
+            right: 10px; 
+            background: rgba(255, 192, 203, 0.3); 
+            border: 2px solid rgba(255, 192, 203, 0.5); 
+            color: white; 
+            padding: 10px 15px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            z-index: 101;
+            font-size: 1.2rem;
+        }
+        .menu-toggle:hover { 
+            background: rgba(255, 192, 203, 0.5); 
+        }
+        .clap-indicator {
+            position: absolute;
+            top: 80px; /* Changed from center to top */
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff6b9d;
+            font-size: 2.5rem; /* Slightly smaller */
+            z-index: 50;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            text-shadow: 0 0 20px rgba(255, 107, 157, 0.8);
+        }
+        .clap-indicator.active {
+            opacity: 1;
+            animation: clapPulse 0.5s ease-out;
+        }
+        @keyframes clapPulse {
+            0% { transform: translateX(-50%) scale(0.5); opacity: 0; }
+            50% { transform: translateX(-50%) scale(1.2); opacity: 1; }
+            100% { transform: translateX(-50%) scale(1); opacity: 0; }
+        }
+        /* Premium Panel Enhancements */
+        #menu {
+            max-height: 90vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 192, 203, 0.5) transparent;
+        }
+        #menu::-webkit-scrollbar {
+            width: 6px;
+        }
+        #menu::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #menu::-webkit-scrollbar-thumb {
+            background: rgba(255, 192, 203, 0.5);
+            border-radius: 3px;
+        }
+        
+        .feather-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin-top: 5px;
+        }
+        
+        .feather-btn {
+            background: linear-gradient(135deg, rgba(255, 107, 157, 0.2), rgba(196, 69, 105, 0.2));
+            border: 1px solid rgba(255, 192, 203, 0.3);
+            color: white;
+            padding: 8px 5px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+        }
+        
+        .feather-btn:hover {
+            background: linear-gradient(135deg, rgba(255, 107, 157, 0.4), rgba(196, 69, 105, 0.4));
+            transform: scale(1.05);
+            border-color: rgba(255, 192, 203, 0.6);
+        }
+        
+        .feather-btn.active {
+            background: linear-gradient(135deg, #ff6b9d, #c44569);
+            border-color: #ff6b9d;
+            box-shadow: 0 0 10px rgba(255, 107, 157, 0.5);
+        }
+        
+        .feather-icon {
+            font-size: 1.2rem;
+        }
+        
+        .premium-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: rgba(255, 192, 203, 0.2);
+            border-radius: 3px;
+            outline: none;
+        }
+        
+        .premium-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, #ff6b9d, #c44569);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255, 107, 157, 0.5);
+        }
+        
+        .premium-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, #ff6b9d, #c44569);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px rgba(255, 107, 157, 0.5);
+        }
+        
+        .menu-select {
+            width: 100%;
+            padding: 8px;
+            background: rgba(255, 192, 203, 0.1);
+            border: 1px solid rgba(255, 192, 203, 0.3);
+            border-radius: 6px;
+            color: white;
+            font-size: 0.85rem;
+            margin-top: 5px;
+            cursor: pointer;
+        }
+        
+        .menu-select option {
+            background: #1a0033;
+            color: white;
+        }
+        
+        .planets-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            margin-top: 8px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .menu-section.collapsible.active .planets-grid {
+            max-height: 200px;
+        }
+        
+        .planet-btn {
+            background: rgba(255, 192, 203, 0.1);
+            border: 1px solid rgba(255, 192, 203, 0.3);
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s;
+        }
+        
+        .planet-btn:hover {
+            background: rgba(255, 192, 203, 0.3);
+            transform: scale(1.1);
+        }
+        
+        .menu-button.premium {
+            background: linear-gradient(135deg, #ff6b9d, #c44569);
+            font-weight: bold;
+        }
+        
+        .collapsible .menu-label {
+            cursor: pointer;
+            user-select: none;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+</head>
+<body>
+
+    <div id="loading">Loading AI Vision...</div>
+    
+    <video id="video-input" playsinline></video>
+    <div id="canvas-container"></div>
+    
+    <div id="ui">
+        <h1 id="shape-name">Sphere</h1>
+        <p>🖐 Move to Rotate | 👌 Pinch to Expand | ✊ Fist to Switch Shape | 👏 Clap to Change Background</p>
+    </div>
+    
+    <div class="menu-toggle" id="menu-toggle">☰</div>
+    <div id="menu">
+        <h3>💖 Premium Control Panel</h3>
+        
+        <!-- Quick Presets Section -->
+        <div class="menu-section">
+            <label class="menu-label">⚡ Quick Presets:</label>
+            <button class="menu-button premium" onclick="resetToDefaults()">🔄 Reset to Default</button>
+            <button class="menu-button premium" onclick="applyPremiumPreset()">✨ Premium Mode</button>
+            <button class="menu-button premium" onclick="applyLovePreset()">💖 Love Mode</button>
+        </div>
+        
+        <!-- Enhanced Feather Section with Visual Preview -->
+        <div class="menu-section">
+            <label class="menu-label">✨ Feather Type:</label>
+            <div class="feather-grid">
+                <button class="feather-btn" onclick="updateFeatherTexture('glow')" data-feather="glow">
+                    <span class="feather-icon">✨</span><span>Glow</span>
+                </button>
+                <button class="feather-btn" onclick="updateFeatherTexture('soft')" data-feather="soft">
+                    <span class="feather-icon">🌸</span><span>Soft</span>
+                </button>
+                <button class="feather-btn" onclick="updateFeatherTexture('sharp')" data-feather="sharp">
+                    <span class="feather-icon">💎</span><span>Sharp</span>
+                </button>
+                <button class="feather-btn" onclick="updateFeatherTexture('default')" data-feather="default">
+                    <span class="feather-icon">⭐</span><span>Default</span>
+                </button>
+                <button class="feather-btn" onclick="updateFeatherTexture('sparkle')" data-feather="sparkle">
+                    <span class="feather-icon">✨</span><span>Sparkle</span>
+                </button>
+                <button class="feather-btn" onclick="updateFeatherTexture('radiant')" data-feather="radiant">
+                    <span class="feather-icon">🌟</span><span>Radiant</span>
+                </button>
+                <button class="feather-btn" onclick="updateFeatherTexture('ethereal')" data-feather="ethereal">
+                    <span class="feather-icon">💫</span><span>Ethereal</span>
+                </button>
+                <button class="feather-btn" onclick="updateFeatherTexture('crystal')" data-feather="crystal">
+                    <span class="feather-icon">💠</span><span>Crystal</span>
+                </button>
+                <button class="feather-btn" onclick="updateFeatherTexture('neon')" data-feather="neon">
+                    <span class="feather-icon">💡</span><span>Neon</span>
+                </button>
+                <button class="feather-btn" onclick="updateFeatherTexture('aurora')" data-feather="aurora">
+                    <span class="feather-icon">🌌</span><span>Aurora</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Enhanced Feather Controls -->
+        <div class="menu-section">
+            <label class="menu-label">🎚️ Feather Intensity: <span id="intensity-value">1.0</span></label>
+            <input type="range" class="menu-control premium-slider" id="feather-intensity" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateFeatherIntensity(this.value)">
+        </div>
+        
+        <div class="menu-section">
+            <label class="menu-label">📏 Particle Size: <span id="size-value">0.15</span></label>
+            <input type="range" class="menu-control premium-slider" id="particle-size" min="0.05" max="0.5" step="0.05" value="0.15" oninput="updateParticleSize(this.value)">
+        </div>
+        
+        <!-- Background Section -->
+        <div class="menu-section">
+            <label class="menu-label">🎨 Background:</label>
+            <button class="menu-button" onclick="switchBackground()">🔄 Next</button>
+            <button class="menu-button" onclick="randomGradientBackground()">🌈 Random</button>
+            <select class="menu-select" id="background-select" onchange="setBackground(this.value)">
+                <option value="space">Space</option>
+                <option value="nebula">Nebula</option>
+                <option value="ocean">Ocean</option>
+                <option value="sunset">Sunset</option>
+                <option value="aurora">Aurora</option>
+                <option value="romantic">Romantic</option>
+                <option value="pinkdream">Pink Dream</option>
+                <option value="starlove">Star Love</option>
+                <option value="valentine">Valentine</option>
+            </select>
+        </div>
+        
+        <!-- Shape Section -->
+        <div class="menu-section">
+            <label class="menu-label">🔷 Shape:</label>
+            <button class="menu-button" onclick="switchShape()">🔄 Next Shape</button>
+            <select class="menu-select" id="shape-select" onchange="morphTo(this.value)">
+                <option value="sphere">Sphere</option>
+            </select>
+        </div>
+        
+        <!-- Planets Quick Access -->
+        <div class="menu-section collapsible">
+            <label class="menu-label" onclick="toggleSection(this)">🪐 Planets ▼</label>
+            <div class="planets-grid">
+                <button class="planet-btn" onclick="morphTo('earth')">🌍</button>
+                <button class="planet-btn" onclick="morphTo('mars')">🔴</button>
+                <button class="planet-btn" onclick="morphTo('jupiter')">🪐</button>
+                <button class="planet-btn" onclick="morphTo('saturn')">🪐</button>
+                <button class="planet-btn" onclick="morphTo('venus')">🟠</button>
+                <button class="planet-btn" onclick="morphTo('mercury')">⚫</button>
+                <button class="planet-btn" onclick="morphTo('neptune')">🔵</button>
+                <button class="planet-btn" onclick="morphTo('uranus')">🔵</button>
+                <button class="planet-btn" onclick="morphTo('pluto')">🔴</button>
+            </div>
+        </div>
+        
+        <!-- Clap Control -->
+        <div class="menu-section">
+            <label class="menu-label">👏 Clap Detection:</label>
+            <button class="menu-button" onclick="toggleClapDetection()" id="clap-toggle">👏 Two-Hand Clap Active</button>
+        </div>
+    </div>
+    <div class="clap-indicator" id="clap-indicator">👏</div>
+
+<script>
+/**
+ * 1. INITIALIZATION & SETUP
+ */
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000000, 0.001);
+
+// Enhanced Background system with gradient mixtures
+const backgrounds = {
+    space: { type: 'solid', color: 0x000000, fog: 0x000000, fogDensity: 0.001 },
+    nebula: { type: 'gradient', colors: [0x1a0033, 0x330066, 0x660099], fog: 0x330066, fogDensity: 0.0008 },
+    ocean: { type: 'gradient', colors: [0x001122, 0x003366, 0x004488], fog: 0x003366, fogDensity: 0.0005 },
+    sunset: { type: 'gradient', colors: [0x330000, 0x660033, 0x990066], fog: 0x660033, fogDensity: 0.0006 },
+    aurora: { type: 'gradient', colors: [0x001122, 0x003344, 0x004466], fog: 0x003344, fogDensity: 0.0007 },
+    void: { type: 'solid', color: 0x000011, fog: 0x000022, fogDensity: 0.0012 },
+    cosmic: { type: 'gradient', colors: [0x0a0a1a, 0x1a1a3a, 0x2a2a5a], fog: 0x1a1a3a, fogDensity: 0.0009 },
+    // Love-themed gradients
+    romantic: { type: 'gradient', colors: [0x330033, 0x660066, 0x990099], fog: 0x660066, fogDensity: 0.0007 },
+    pinkdream: { type: 'gradient', colors: [0x330033, 0x660066, 0xff69b4], fog: 0x660066, fogDensity: 0.0006 },
+    starlove: { type: 'gradient', colors: [0x1a0033, 0x4a0066, 0xff1493], fog: 0x4a0066, fogDensity: 0.0008 },
+    valentine: { type: 'gradient', colors: [0xff1493, 0xff69b4, 0xffb6c1], fog: 0xff69b4, fogDensity: 0.0005 }
+};
+
+let currentBackgroundIndex = 0;
+const backgroundKeys = Object.keys(backgrounds);
+
+// Create gradient background
+function createGradientBackground(colors) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createLinearGradient(0, 0, 256, 256);
+    
+    for (let i = 0; i < colors.length; i++) {
+        const color = colors[i];
+        const r = (color >> 16) & 0xff;
+        const g = (color >> 8) & 0xff;
+        const b = color & 0xff;
+        gradient.addColorStop(i / (colors.length - 1), `rgb(${r}, ${g}, ${b})`);
+    }
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 256, 256);
+    const texture = new THREE.Texture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+}
+
+function setBackground(bgKey) {
+    const bg = backgrounds[bgKey];
+    if (bg.type === 'gradient') {
+        const texture = createGradientBackground(bg.colors);
+        scene.background = texture;
+    } else {
+        scene.background = new THREE.Color(bg.color);
+    }
+    scene.fog = new THREE.FogExp2(bg.fog, bg.fogDensity);
+    
+    // Update background select dropdown
+    if (document.getElementById('background-select')) {
+        document.getElementById('background-select').value = bgKey;
+    }
+}
+
+function randomGradientBackground() {
+    const gradientBgs = backgroundKeys.filter(key => backgrounds[key].type === 'gradient');
+    const randomKey = gradientBgs[Math.floor(Math.random() * gradientBgs.length)];
+    setBackground(randomKey);
+}
+
+function switchBackground() {
+    currentBackgroundIndex = (currentBackgroundIndex + 1) % backgroundKeys.length;
+    setBackground(backgroundKeys[currentBackgroundIndex]);
+}
+
+// Initialize background
+setBackground(backgroundKeys[0]);
+
+// Visual Two-Hand Clap Detection System (No Audio Required)
+let lastTwoHandClapTime = 0;
+let twoHandClapThreshold = 0.15; // Distance threshold for clap detection
+
+function detectTwoHandClap(landmarks1, landmarks2) {
+    if (!landmarks1 || !landmarks2) return false;
+    
+    // Get palm centers (wrist points)
+    const palm1 = landmarks1[0]; // Wrist of first hand
+    const palm2 = landmarks2[0]; // Wrist of second hand
+    
+    // Calculate distance between palms
+    const distance = Math.sqrt(
+        Math.pow(palm1.x - palm2.x, 2) + 
+        Math.pow(palm1.y - palm2.y, 2)
+    );
+    
+    // Detect clap: hands come close together
+    if (distance < twoHandClapThreshold && Date.now() - lastTwoHandClapTime > 800) {
+        lastTwoHandClapTime = Date.now();
+        showClapIndicator();
+        switchBackground();
+        return true;
+    }
+    return false;
+}
+
+function showClapIndicator() {
+    const indicator = document.getElementById('clap-indicator');
+    indicator.classList.add('active');
+    setTimeout(() => indicator.classList.remove('active'), 500);
+}
+
+function toggleClapDetection() {
+    // Visual detection is always on, this is just for UI
+    const button = document.getElementById('clap-toggle');
+    button.textContent = '👏 Two-Hand Clap Active';
+}
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.z = 30;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+// Particle Configuration
+const PARTICLE_COUNT = 15000;
+let PARTICLE_SIZE = 0.15; // Changed from const to let for dynamic control
+const geometry = new THREE.BufferGeometry();
+const positions = new Float32Array(PARTICLE_COUNT * 3);
+const colors = new Float32Array(PARTICLE_COUNT * 3);
+const targetPositions = new Float32Array(PARTICLE_COUNT * 3);
+
+// Initialize particles randomly first
+for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
+    positions[i] = (Math.random() - 0.5) * 50;
+    targetPositions[i] = positions[i];
+    colors[i] = 1.0;
+}
+
+geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+// Feather texture customization system
+let currentFeatherType = 'glow';
+let customFeatherSettings = {
+    intensity: 1.0,
+    softness: 0.5,
+    glowRadius: 1.0
+};
+
+// Create enhanced feather-like texture with multiple color stops
+const getTexture = (featherType = 'default', customSettings = null) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; // Increased resolution for better quality
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    const center = 32;
+    const grad = ctx.createRadialGradient(center, center, 0, center, center, 32);
+    
+    const settings = customSettings || customFeatherSettings;
+    const intensity = settings.intensity || 1.0;
+    const softness = settings.softness || 0.5;
+    
+    if (featherType === 'soft') {
+        // Ultra-soft feather with many stops
+        grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+        grad.addColorStop(0.05, `rgba(255, 255, 255, ${intensity * 0.98})`);
+        grad.addColorStop(0.1, `rgba(255, 255, 255, ${intensity * 0.95})`);
+        grad.addColorStop(0.15, `rgba(255, 255, 255, ${intensity * 0.9})`);
+        grad.addColorStop(0.2, `rgba(255, 255, 255, ${intensity * 0.85})`);
+        grad.addColorStop(0.25, `rgba(255, 255, 255, ${intensity * 0.78})`);
+        grad.addColorStop(0.3, `rgba(255, 255, 255, ${intensity * 0.7})`);
+        grad.addColorStop(0.35, `rgba(255, 255, 255, ${intensity * 0.6})`);
+        grad.addColorStop(0.4, `rgba(255, 255, 255, ${intensity * 0.5})`);
+        grad.addColorStop(0.45, `rgba(255, 255, 255, ${intensity * 0.4})`);
+        grad.addColorStop(0.5, `rgba(255, 255, 255, ${intensity * 0.32})`);
+        grad.addColorStop(0.55, `rgba(255, 255, 255, ${intensity * 0.25})`);
+        grad.addColorStop(0.6, `rgba(255, 255, 255, ${intensity * 0.18})`);
+        grad.addColorStop(0.65, `rgba(255, 255, 255, ${intensity * 0.12})`);
+        grad.addColorStop(0.7, `rgba(255, 255, 255, ${intensity * 0.08})`);
+        grad.addColorStop(0.75, `rgba(255, 255, 255, ${intensity * 0.05})`);
+        grad.addColorStop(0.8, `rgba(255, 255, 255, ${intensity * 0.03})`);
+        grad.addColorStop(0.85, `rgba(255, 255, 255, ${intensity * 0.02})`);
+        grad.addColorStop(0.9, `rgba(255, 255, 255, ${intensity * 0.01})`);
+        grad.addColorStop(0.95, `rgba(255, 255, 255, ${intensity * 0.005})`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else if (featherType === 'sharp') {
+        // Sharp feather with defined edges
+        grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+        grad.addColorStop(0.2, `rgba(255, 255, 255, ${intensity * 0.95})`);
+        grad.addColorStop(0.4, `rgba(255, 255, 255, ${intensity * 0.8})`);
+        grad.addColorStop(0.5, `rgba(255, 255, 255, ${intensity * 0.6})`);
+        grad.addColorStop(0.6, `rgba(255, 255, 255, ${intensity * 0.4})`);
+        grad.addColorStop(0.7, `rgba(255, 255, 255, ${intensity * 0.25})`);
+        grad.addColorStop(0.8, `rgba(255, 255, 255, ${intensity * 0.12})`);
+        grad.addColorStop(0.9, `rgba(255, 255, 255, ${intensity * 0.04})`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else if (featherType === 'glow') {
+        // Perfect balanced glow - not too heavy
+        grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+        grad.addColorStop(0.1, `rgba(255, 255, 255, ${intensity * 0.92})`);
+        grad.addColorStop(0.2, `rgba(255, 255, 255, ${intensity * 0.82})`);
+        grad.addColorStop(0.3, `rgba(255, 255, 255, ${intensity * 0.68})`);
+        grad.addColorStop(0.4, `rgba(255, 255, 255, ${intensity * 0.52})`);
+        grad.addColorStop(0.5, `rgba(255, 255, 255, ${intensity * 0.38})`);
+        grad.addColorStop(0.6, `rgba(255, 255, 255, ${intensity * 0.26})`);
+        grad.addColorStop(0.7, `rgba(255, 255, 255, ${intensity * 0.16})`);
+        grad.addColorStop(0.8, `rgba(255, 255, 255, ${intensity * 0.09})`);
+        grad.addColorStop(0.9, `rgba(255, 255, 255, ${intensity * 0.04})`);
+        grad.addColorStop(0.95, `rgba(255, 255, 255, ${intensity * 0.015})`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else if (featherType === 'sparkle') {
+        // Sparkle feather with bright center
+        grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+        grad.addColorStop(0.05, `rgba(255, 255, 255, ${intensity * 0.98})`);
+        grad.addColorStop(0.1, `rgba(255, 255, 200, ${intensity * 0.9})`);
+        grad.addColorStop(0.2, `rgba(255, 255, 255, ${intensity * 0.75})`);
+        grad.addColorStop(0.3, `rgba(255, 255, 255, ${intensity * 0.6})`);
+        grad.addColorStop(0.4, `rgba(255, 255, 255, ${intensity * 0.45})`);
+        grad.addColorStop(0.5, `rgba(255, 255, 255, ${intensity * 0.32})`);
+        grad.addColorStop(0.6, `rgba(255, 255, 255, ${intensity * 0.22})`);
+        grad.addColorStop(0.7, `rgba(255, 255, 255, ${intensity * 0.14})`);
+        grad.addColorStop(0.8, `rgba(255, 255, 255, ${intensity * 0.08})`);
+        grad.addColorStop(0.9, `rgba(255, 255, 255, ${intensity * 0.04})`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else if (featherType === 'radiant') {
+        // Radiant feather with extended glow
+        grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+        grad.addColorStop(0.15, `rgba(255, 255, 255, ${intensity * 0.9})`);
+        grad.addColorStop(0.3, `rgba(255, 255, 255, ${intensity * 0.75})`);
+        grad.addColorStop(0.45, `rgba(255, 255, 255, ${intensity * 0.6})`);
+        grad.addColorStop(0.6, `rgba(255, 255, 255, ${intensity * 0.45})`);
+        grad.addColorStop(0.7, `rgba(255, 255, 255, ${intensity * 0.3})`);
+        grad.addColorStop(0.8, `rgba(255, 255, 255, ${intensity * 0.18})`);
+        grad.addColorStop(0.9, `rgba(255, 255, 255, ${intensity * 0.1})`);
+        grad.addColorStop(0.95, `rgba(255, 255, 255, ${intensity * 0.05})`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else if (featherType === 'ethereal') {
+        // Ethereal feather - very soft and dreamy
+        grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+        grad.addColorStop(0.1, `rgba(255, 255, 255, ${intensity * 0.85})`);
+        grad.addColorStop(0.2, `rgba(255, 255, 255, ${intensity * 0.7})`);
+        grad.addColorStop(0.3, `rgba(255, 255, 255, ${intensity * 0.55})`);
+        grad.addColorStop(0.4, `rgba(255, 255, 255, ${intensity * 0.42})`);
+        grad.addColorStop(0.5, `rgba(255, 255, 255, ${intensity * 0.3})`);
+        grad.addColorStop(0.6, `rgba(255, 255, 255, ${intensity * 0.2})`);
+        grad.addColorStop(0.7, `rgba(255, 255, 255, ${intensity * 0.13})`);
+        grad.addColorStop(0.8, `rgba(255, 255, 255, ${intensity * 0.08})`);
+        grad.addColorStop(0.9, `rgba(255, 255, 255, ${intensity * 0.04})`);
+        grad.addColorStop(0.95, `rgba(255, 255, 255, ${intensity * 0.02})`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else if (featherType === 'crystal') {
+        // Crystal feather - sharp and bright
+        grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+        grad.addColorStop(0.1, `rgba(200, 255, 255, ${intensity * 0.95})`);
+        grad.addColorStop(0.2, `rgba(255, 255, 255, ${intensity * 0.85})`);
+        grad.addColorStop(0.3, `rgba(255, 255, 255, ${intensity * 0.7})`);
+        grad.addColorStop(0.4, `rgba(255, 255, 255, ${intensity * 0.55})`);
+        grad.addColorStop(0.5, `rgba(255, 255, 255, ${intensity * 0.4})`);
+        grad.addColorStop(0.6, `rgba(255, 255, 255, ${intensity * 0.28})`);
+        grad.addColorStop(0.7, `rgba(255, 255, 255, ${intensity * 0.18})`);
+        grad.addColorStop(0.8, `rgba(255, 255, 255, ${intensity * 0.1})`);
+        grad.addColorStop(0.9, `rgba(255, 255, 255, ${intensity * 0.05})`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else if (featherType === 'neon') {
+        // Neon feather - bright and vibrant
+        grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+        grad.addColorStop(0.05, `rgba(255, 100, 255, ${intensity * 0.98})`);
+        grad.addColorStop(0.1, `rgba(100, 255, 255, ${intensity * 0.9})`);
+        grad.addColorStop(0.2, `rgba(255, 255, 255, ${intensity * 0.75})`);
+        grad.addColorStop(0.3, `rgba(255, 255, 255, ${intensity * 0.6})`);
+        grad.addColorStop(0.4, `rgba(255, 255, 255, ${intensity * 0.45})`);
+        grad.addColorStop(0.5, `rgba(255, 255, 255, ${intensity * 0.32})`);
+        grad.addColorStop(0.6, `rgba(255, 255, 255, ${intensity * 0.22})`);
+        grad.addColorStop(0.7, `rgba(255, 255, 255, ${intensity * 0.14})`);
+        grad.addColorStop(0.8, `rgba(255, 255, 255, ${intensity * 0.08})`);
+        grad.addColorStop(0.9, `rgba(255, 255, 255, ${intensity * 0.04})`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else if (featherType === 'aurora') {
+        // Aurora feather - soft color transitions
+        grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+        grad.addColorStop(0.1, `rgba(200, 255, 255, ${intensity * 0.9})`);
+        grad.addColorStop(0.2, `rgba(150, 255, 200, ${intensity * 0.8})`);
+        grad.addColorStop(0.3, `rgba(255, 255, 255, ${intensity * 0.65})`);
+        grad.addColorStop(0.4, `rgba(255, 255, 255, ${intensity * 0.5})`);
+        grad.addColorStop(0.5, `rgba(255, 255, 255, ${intensity * 0.38})`);
+        grad.addColorStop(0.6, `rgba(255, 255, 255, ${intensity * 0.26})`);
+        grad.addColorStop(0.7, `rgba(255, 255, 255, ${intensity * 0.16})`);
+        grad.addColorStop(0.8, `rgba(255, 255, 255, ${intensity * 0.09})`);
+        grad.addColorStop(0.9, `rgba(255, 255, 255, ${intensity * 0.04})`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    } else {
+        // Default enhanced feather
+        grad.addColorStop(0, `rgba(255, 255, 255, ${intensity})`);
+        grad.addColorStop(0.08, `rgba(255, 255, 255, ${intensity * 0.95})`);
+        grad.addColorStop(0.15, `rgba(255, 255, 255, ${intensity * 0.88})`);
+        grad.addColorStop(0.22, `rgba(255, 255, 255, ${intensity * 0.78})`);
+        grad.addColorStop(0.3, `rgba(255, 255, 255, ${intensity * 0.65})`);
+        grad.addColorStop(0.38, `rgba(255, 255, 255, ${intensity * 0.52})`);
+        grad.addColorStop(0.45, `rgba(255, 255, 255, ${intensity * 0.4})`);
+        grad.addColorStop(0.52, `rgba(255, 255, 255, ${intensity * 0.3})`);
+        grad.addColorStop(0.6, `rgba(255, 255, 255, ${intensity * 0.22})`);
+        grad.addColorStop(0.68, `rgba(255, 255, 255, ${intensity * 0.15})`);
+        grad.addColorStop(0.75, `rgba(255, 255, 255, ${intensity * 0.1})`);
+        grad.addColorStop(0.82, `rgba(255, 255, 255, ${intensity * 0.06})`);
+        grad.addColorStop(0.88, `rgba(255, 255, 255, ${intensity * 0.03})`);
+        grad.addColorStop(0.93, `rgba(255, 255, 255, ${intensity * 0.015})`);
+        grad.addColorStop(0.97, `rgba(255, 255, 255, ${intensity * 0.008})`);
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    }
+    
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 64, 64);
+    const texture = new THREE.Texture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+};
+
+function updateFeatherTexture(type) {
+    currentFeatherType = type;
+    material.map = getTexture(type, customFeatherSettings);
+    material.needsUpdate = true;
+    updateActiveFeatherButton();
+}
+
+const material = new THREE.PointsMaterial({
+    size: PARTICLE_SIZE,
+    map: getTexture('glow'), // Use new 'glow' type for perfect balance
+    vertexColors: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.95, // Slight transparency for better glow
+    sizeAttenuation: true
+});
+
+// Add subtle glow post-processing effect
+renderer.setClearColor(0x000000, 0);
+
+const particles = new THREE.Points(geometry, material);
+scene.add(particles);
+
+/**
+ * 2. SHAPE GENERATION MATH
+ */
+const shapes = {
+    sphere: (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 10 + Math.random() * 0.5;
+        return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+    },
+    heart: (i) => {
+        // Parametric heart equations
+        let t = Math.random() * Math.PI * 2;
+        // Spread points more evenly
+        let u = Math.random();
+        // X = 16sin^3(t)
+        let x = 16 * Math.pow(Math.sin(t), 3);
+        // Y = 13cos(t) - 5cos(2t) - 2cos(3t) - cos(4t)
+        let y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        // Add Z depth (heart volume)
+        let z = (Math.random() - 0.5) * 4; 
+        
+        // Scale down
+        return [x * 0.8, y * 0.8, z];
+    },
+    flower: (i) => {
+        const angle = (i / PARTICLE_COUNT) * Math.PI * 2 * 20; // Loops
+        const r = 5 + Math.cos(angle * 5) * 5 + (Math.random() * 2);
+        const z = (Math.random() - 0.5) * 5;
+        // Spiral fill
+        const spiral = i * 0.1;
+        return [
+            r * Math.cos(spiral) * 1.5,
+            r * Math.sin(spiral) * 1.5,
+            z
+        ];
+    },
+    saturn: (i) => {
+        // 70% Sphere, 30% Ring
+        if (Math.random() > 0.3) {
+            // Planet body
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+            const r = 6;
+            return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+        } else {
+            // Rings
+            const angle = Math.random() * Math.PI * 2;
+            const r = 9 + Math.random() * 5;
+            return [r * Math.cos(angle), (Math.random() - 0.5) * 0.5, r * Math.sin(angle)];
+        }
+    },
+    // More Planets
+    earth: (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 8 + Math.random() * 0.5;
+        return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+    },
+    jupiter: (i) => {
+        // Larger planet with bands
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 9 + Math.sin(theta * 3) * 0.5 + Math.random() * 0.5;
+        return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+    },
+    mars: (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 7 + Math.random() * 0.5;
+        return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+    },
+    neptune: (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 8.5 + Math.random() * 0.5;
+        return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+    },
+    // More Geometric Shapes
+    cube: (i) => {
+        const side = Math.floor(Math.random() * 6);
+        const u = (Math.random() - 0.5) * 2;
+        const v = (Math.random() - 0.5) * 2;
+        const size = 8;
+        switch(side) {
+            case 0: return [size, u * size, v * size];
+            case 1: return [-size, u * size, v * size];
+            case 2: return [u * size, size, v * size];
+            case 3: return [u * size, -size, v * size];
+            case 4: return [u * size, v * size, size];
+            default: return [u * size, v * size, -size];
+        }
+    },
+    torus: (i) => {
+        const u = Math.random() * Math.PI * 2;
+        const v = Math.random() * Math.PI * 2;
+        const R = 7;
+        const r = 3;
+        return [
+            (R + r * Math.cos(v)) * Math.cos(u),
+            (R + r * Math.cos(v)) * Math.sin(u),
+            r * Math.sin(v)
+        ];
+    },
+    star: (i) => {
+        const angle = (i / PARTICLE_COUNT) * Math.PI * 2 * 5;
+        const outerR = 10;
+        const innerR = 4;
+        const r = (i % 2 === 0) ? outerR : innerR;
+        return [
+            r * Math.cos(angle),
+            r * Math.sin(angle),
+            (Math.random() - 0.5) * 3
+        ];
+    },
+    spiral: (i) => {
+        const t = (i / PARTICLE_COUNT) * Math.PI * 8;
+        const r = t * 0.5;
+        return [
+            r * Math.cos(t) * 0.8,
+            r * Math.sin(t) * 0.8,
+            (i / PARTICLE_COUNT - 0.5) * 15
+        ];
+    },
+    diamond: (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 8 + Math.random() * 0.5;
+        // Diamond shape: more particles at top and bottom
+        const diamondR = r * (1 + Math.abs(Math.cos(phi)) * 0.5);
+        return [
+            diamondR * Math.sin(phi) * Math.cos(theta),
+            diamondR * Math.sin(phi) * Math.sin(theta),
+            diamondR * Math.cos(phi)
+        ];
+    },
+    // More Organic Shapes
+    butterfly: (i) => {
+        const t = Math.random() * Math.PI * 2;
+        const wing = Math.random() > 0.5 ? 1 : -1;
+        const r = 5 + Math.sin(t * 4) * 3;
+        return [
+            wing * r * Math.cos(t) * 0.8,
+            Math.abs(Math.sin(t * 2)) * 8 - 2,
+            (Math.random() - 0.5) * 2
+        ];
+    },
+    dna: (i) => {
+        const t = (i / PARTICLE_COUNT) * Math.PI * 10;
+        const r = 4;
+        const strand = i % 2 === 0 ? 1 : -1;
+        return [
+            r * Math.cos(t) * strand,
+            r * Math.sin(t),
+            (i / PARTICLE_COUNT - 0.5) * 20
+        ];
+    },
+    galaxy: (i) => {
+        const angle = (i / PARTICLE_COUNT) * Math.PI * 2 * 3;
+        const r = Math.sqrt(Math.random()) * 12;
+        const spiral = angle * 2;
+        return [
+            r * Math.cos(spiral) * 0.8,
+            r * Math.sin(spiral) * 0.8,
+            (Math.random() - 0.5) * 2
+        ];
+    },
+    loveheart: (i) => {
+        // Alternative heart shape - more detailed
+        let t = Math.random() * Math.PI * 2;
+        let x = 16 * Math.pow(Math.sin(t), 3);
+        let y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        let z = Math.sin(t * 2) * 2 + (Math.random() - 0.5) * 1;
+        return [x * 0.7, y * 0.7, z];
+    },
+    pyramid: (i) => {
+        const base = Math.random() > 0.7;
+        if (base) {
+            const angle = Math.random() * Math.PI * 2;
+            const r = Math.random() * 8;
+            return [r * Math.cos(angle), -6, r * Math.sin(angle)];
+        } else {
+            const side = Math.floor(Math.random() * 3);
+            const u = Math.random();
+            const v = Math.random();
+            const size = 8;
+            const height = 10;
+            switch(side) {
+                case 0: return [u * size - size/2, v * height - 6, -size/2];
+                case 1: return [size/2, v * height - 6, u * size - size/2];
+                default: return [u * size - size/2, v * height - 6, size/2];
+            }
+        }
+    },
+    helix: (i) => {
+        const t = (i / PARTICLE_COUNT) * Math.PI * 12;
+        const r = 5;
+        return [
+            r * Math.cos(t),
+            (i / PARTICLE_COUNT - 0.5) * 20,
+            r * Math.sin(t)
+        ];
+    },
+    // More Planets
+    venus: (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 7.5 + Math.random() * 0.5;
+        return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+    },
+    mercury: (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 6.5 + Math.random() * 0.5;
+        return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+    },
+    uranus: (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 8.8 + Math.random() * 0.5;
+        return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+    },
+    pluto: (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 5.5 + Math.random() * 0.5;
+        return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+    },
+    // Crystal Shapes
+    crystal: (i) => {
+        const faces = 6;
+        const face = Math.floor(Math.random() * faces);
+        const u = Math.random();
+        const v = Math.random();
+        const size = 8;
+        const height = 12;
+        
+        // Hexagonal crystal base
+        if (face < 6) {
+            const angle = (face / faces) * Math.PI * 2;
+            const nextAngle = ((face + 1) / faces) * Math.PI * 2;
+            const r1 = size * (1 - v);
+            const r2 = size * (1 - v);
+            const x1 = r1 * Math.cos(angle);
+            const z1 = r1 * Math.sin(angle);
+            const x2 = r2 * Math.cos(nextAngle);
+            const z2 = r2 * Math.sin(nextAngle);
+            const x = (x1 + (x2 - x1) * u) * (1 - v * 0.3);
+            const z = (z1 + (z2 - z1) * u) * (1 - v * 0.3);
+            const y = v * height - height/2;
+            return [x, y, z];
+        }
+        return [0, 0, 0];
+    },
+    crystalcluster: (i) => {
+        const cluster = Math.floor(i / (PARTICLE_COUNT / 5));
+        const localI = i % (PARTICLE_COUNT / 5);
+        const offsetX = (cluster % 3 - 1) * 6;
+        const offsetZ = (Math.floor(cluster / 3) - 1) * 6;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 3 + Math.random() * 2;
+        return [
+            r * Math.sin(phi) * Math.cos(theta) + offsetX,
+            r * Math.sin(phi) * Math.sin(theta),
+            r * Math.cos(phi) + offsetZ
+        ];
+    },
+    diamondcrystal: (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const r = 8 + Math.random() * 0.5;
+        // Sharp crystal points
+        const crystalR = r * (1 + Math.abs(Math.cos(phi * 2)) * 0.4);
+        return [
+            crystalR * Math.sin(phi) * Math.cos(theta),
+            crystalR * Math.sin(phi) * Math.sin(theta),
+            crystalR * Math.cos(phi)
+        ];
+    },
+    geode: (i) => {
+        if (Math.random() > 0.3) {
+            // Outer shell
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+            const r = 9 + Math.random() * 1;
+            return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+        } else {
+            // Inner crystals
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+            const r = 4 + Math.random() * 2;
+            return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+        }
+    },
+    prism: (i) => {
+        const sides = 8;
+        const side = Math.floor(Math.random() * sides);
+        const u = Math.random();
+        const v = Math.random();
+        const size = 7;
+        const height = 10;
+        const angle = (side / sides) * Math.PI * 2;
+        const nextAngle = ((side + 1) / sides) * Math.PI * 2;
+        const r = size * (1 - v * 0.5);
+        const x = r * (Math.cos(angle) + (Math.cos(nextAngle) - Math.cos(angle)) * u);
+        const z = r * (Math.sin(angle) + (Math.sin(nextAngle) - Math.sin(angle)) * u);
+        const y = (v - 0.5) * height;
+        return [x, y, z];
+    },
+    // Advanced Geometric Shapes
+    octahedron: (i) => {
+        const face = Math.floor(Math.random() * 8);
+        const u = Math.random();
+        const v = Math.random();
+        const size = 8;
+        const faces = [
+            [0, size, 0], [size, 0, 0], [0, 0, size], [-size, 0, 0],
+            [0, 0, -size], [0, -size, 0], [size/2, size/2, 0], [-size/2, -size/2, 0]
+        ];
+        const base = faces[face % 8];
+        return [
+            base[0] + (Math.random() - 0.5) * 2,
+            base[1] + (Math.random() - 0.5) * 2,
+            base[2] + (Math.random() - 0.5) * 2
+        ];
+    },
+    icosahedron: (i) => {
+        const phi = (1 + Math.sqrt(5)) / 2;
+        const vertices = [];
+        for (let j = 0; j < 12; j++) {
+            const x = (j % 2 === 0 ? 1 : -1) * phi;
+            const y = Math.cos(j * Math.PI / 6) * phi;
+            const z = Math.sin(j * Math.PI / 6) * phi;
+            vertices.push([x * 3, y * 3, z * 3]);
+        }
+        const v = vertices[Math.floor(Math.random() * vertices.length)];
+        return [v[0], v[1], v[2]];
+    },
+    dodecahedron: (i) => {
+        const phi = (1 + Math.sqrt(5)) / 2;
+        const size = 7;
+        const theta = Math.random() * Math.PI * 2;
+        const phiAngle = Math.acos((Math.random() * 2) - 1);
+        const r = size * (1 + Math.cos(phiAngle * 3) * 0.2);
+        return [
+            r * Math.sin(phiAngle) * Math.cos(theta),
+            r * Math.sin(phiAngle) * Math.sin(theta),
+            r * Math.cos(phiAngle)
+        ];
+    },
+    // Organic & Natural Shapes
+    tree: (i) => {
+        if (i < PARTICLE_COUNT * 0.3) {
+            // Trunk
+            const angle = Math.random() * Math.PI * 2;
+            const r = Math.random() * 1.5;
+            const y = Math.random() * 8 - 4;
+            return [r * Math.cos(angle), y, r * Math.sin(angle)];
+        } else {
+            // Foliage
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+            const r = 3 + Math.random() * 4;
+            return [
+                r * Math.sin(phi) * Math.cos(theta),
+                r * Math.sin(phi) * Math.sin(theta) + 2,
+                r * Math.cos(phi)
+            ];
+        }
+    },
+    snowflake: (i) => {
+        const branches = 6;
+        const branch = Math.floor((i / PARTICLE_COUNT) * branches);
+        const t = (i % (PARTICLE_COUNT / branches)) / (PARTICLE_COUNT / branches);
+        const angle = (branch / branches) * Math.PI * 2;
+        const r = t * 8;
+        const x = r * Math.cos(angle) + Math.cos(angle + Math.PI/2) * t * 3;
+        const y = r * Math.sin(angle) + Math.sin(angle + Math.PI/2) * t * 3;
+        return [x, y, (Math.random() - 0.5) * 0.5];
+    },
+    leaf: (i) => {
+        const t = Math.random() * Math.PI * 2;
+        const u = Math.random();
+        const r = 6 * (1 - u * 0.3);
+        const x = r * Math.cos(t) * (1 + Math.sin(t * 2) * 0.3);
+        const y = r * Math.sin(t) * (1 + Math.cos(t * 2) * 0.2);
+        return [x * 0.8, y * 0.8, (Math.random() - 0.5) * 1];
+    },
+    // Abstract & Artistic Shapes
+    mandala: (i) => {
+        const rings = 5;
+        const ring = Math.floor((i / PARTICLE_COUNT) * rings);
+        const angle = (i % (PARTICLE_COUNT / rings)) / (PARTICLE_COUNT / rings) * Math.PI * 2;
+        const r = (ring + 1) * 2 + Math.sin(angle * (ring + 1) * 2) * 0.5;
+        return [
+            r * Math.cos(angle),
+            r * Math.sin(angle),
+            (Math.random() - 0.5) * 2
+        ];
+    },
+    yinyang: (i) => {
+        const t = Math.random() * Math.PI * 2;
+        const r = Math.random() * 8;
+        const side = r < 4 ? 1 : -1;
+        const offsetX = side * 2;
+        const offsetY = side * (r < 4 ? 2 : -2);
+        return [
+            r * Math.cos(t) + offsetX,
+            r * Math.sin(t) + offsetY,
+            (Math.random() - 0.5) * 1
+        ];
+    },
+    infinity: (i) => {
+        const t = (i / PARTICLE_COUNT) * Math.PI * 4;
+        const r = 4;
+        const x = r * Math.sin(t) / (1 + Math.cos(t) * Math.cos(t));
+        const y = r * Math.sin(t) * Math.cos(t) / (1 + Math.cos(t) * Math.cos(t));
+        return [x, y, (Math.random() - 0.5) * 3];
+    },
+    // Space & Cosmic Shapes
+    comet: (i) => {
+        if (i < PARTICLE_COUNT * 0.1) {
+            // Head
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+            const r = 2 + Math.random() * 1;
+            return [r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi)];
+        } else {
+            // Tail
+            const t = (i / PARTICLE_COUNT) * 15;
+            const r = Math.random() * 2;
+            return [
+                r * Math.cos(t) - t * 0.3,
+                r * Math.sin(t),
+                -t * 0.5
+            ];
+        }
+    },
+    blackhole: (i) => {
+        const angle = (i / PARTICLE_COUNT) * Math.PI * 2 * 10;
+        const r = Math.sqrt(Math.random()) * 10;
+        const spiral = angle * 3;
+        const z = (i / PARTICLE_COUNT - 0.5) * 2;
+        return [
+            r * Math.cos(spiral) * 0.7,
+            r * Math.sin(spiral) * 0.7,
+            z
+        ];
+    },
+    constellation: (i) => {
+        const stars = 8;
+        const star = Math.floor((i / PARTICLE_COUNT) * stars);
+        const angle = (star / stars) * Math.PI * 2;
+        const r = 6 + Math.random() * 4;
+        const x = r * Math.cos(angle) + (Math.random() - 0.5) * 2;
+        const y = r * Math.sin(angle) + (Math.random() - 0.5) * 2;
+        return [x, y, (Math.random() - 0.5) * 3];
+    },
+    // Architectural Shapes
+    arch: (i) => {
+        const t = Math.random() * Math.PI;
+        const r = 8;
+        const x = r * Math.cos(t);
+        const y = r * Math.sin(t) - 4;
+        return [x, y, (Math.random() - 0.5) * 2];
+    },
+    dome: (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(Math.random());
+        const r = 8;
+        return [
+            r * Math.sin(phi) * Math.cos(theta),
+            r * Math.cos(phi),
+            r * Math.sin(phi) * Math.sin(theta)
+        ];
+    },
+    // Animal & Nature Shapes
+    bird: (i) => {
+        const wing = Math.random() > 0.5 ? 1 : -1;
+        const t = Math.random() * Math.PI * 2;
+        const r = 4 + Math.sin(t * 3) * 2;
+        return [
+            wing * r * Math.cos(t) * 0.9,
+            Math.abs(Math.sin(t * 2)) * 6 - 1,
+            (Math.random() - 0.5) * 1.5
+        ];
+    },
+    fish: (i) => {
+        const t = Math.random() * Math.PI * 2;
+        const r = 5 + Math.cos(t * 2) * 2;
+        return [
+            r * Math.cos(t) * 0.8,
+            r * Math.sin(t) * 0.6,
+            (Math.random() - 0.5) * 2
+        ];
+    },
+    // Symbolic Shapes
+    peace: (i) => {
+        const t = Math.random() * Math.PI * 2;
+        const part = Math.random();
+        if (part < 0.33) {
+            // Circle
+            const r = 4;
+            return [r * Math.cos(t), r * Math.sin(t) + 2, (Math.random() - 0.5) * 1];
+        } else if (part < 0.66) {
+            // Line 1
+            const y = (Math.random() - 0.5) * 8;
+            return [(Math.random() - 0.5) * 1, y, (Math.random() - 0.5) * 1];
+        } else {
+            // Line 2
+            const angle = Math.PI / 4;
+            const dist = (Math.random() - 0.5) * 8;
+            return [dist * Math.cos(angle), dist * Math.sin(angle), (Math.random() - 0.5) * 1];
+        }
+    },
+    atom: (i) => {
+        const shell = Math.floor((i / PARTICLE_COUNT) * 3);
+        const t = (i % (PARTICLE_COUNT / 3)) / (PARTICLE_COUNT / 3) * Math.PI * 2;
+        const r = (shell + 1) * 3;
+        const orbit = shell % 2 === 0 ? 0 : Math.PI / 2;
+        return [
+            r * Math.cos(t + orbit),
+            r * Math.sin(t + orbit) * Math.cos(orbit),
+            r * Math.sin(t + orbit) * Math.sin(orbit)
+        ];
+    },
+    // Enhanced Love Shapes
+    doubleheart: (i) => {
+        const heart = i % 2;
+        const t = Math.random() * Math.PI * 2;
+        let x = 16 * Math.pow(Math.sin(t), 3);
+        let y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        const offsetX = heart === 0 ? -6 : 6;
+        return [x * 0.6 + offsetX, y * 0.6, (Math.random() - 0.5) * 2];
+    },
+    heartstar: (i) => {
+        if (i < PARTICLE_COUNT * 0.5) {
+            // Heart shape
+            const t = Math.random() * Math.PI * 2;
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+            return [x * 0.7, y * 0.7, (Math.random() - 0.5) * 2];
+        } else {
+            // Star points
+            const angle = (i / PARTICLE_COUNT) * Math.PI * 2 * 5;
+            const outerR = 8;
+            const innerR = 3;
+            const r = (i % 2 === 0) ? outerR : innerR;
+            return [
+                r * Math.cos(angle),
+                r * Math.sin(angle) + 2,
+                (Math.random() - 0.5) * 2
+            ];
+        }
+    },
+    lovering: (i) => {
+        const t = (i / PARTICLE_COUNT) * Math.PI * 2;
+        const r = 6 + Math.sin(t * 5) * 1;
+        const x = r * Math.cos(t);
+        const y = r * Math.sin(t);
+        // Add heart shape modulation
+        const heartMod = Math.sin(t * 2) * 0.5;
+        return [x + heartMod, y, (Math.random() - 0.5) * 1.5];
+    },
+    cupid: (i) => {
+        if (i < PARTICLE_COUNT * 0.3) {
+            // Arrow body
+            const t = (i / PARTICLE_COUNT) * 10;
+            return [t * 0.5 - 5, 0, (Math.random() - 0.5) * 0.5];
+        } else if (i < PARTICLE_COUNT * 0.4) {
+            // Arrow head
+            const angle = ((i - PARTICLE_COUNT * 0.3) / (PARTICLE_COUNT * 0.1)) * Math.PI * 2;
+            return [5, Math.cos(angle) * 2, Math.sin(angle) * 2];
+        } else {
+            // Heart tip
+            const t = Math.random() * Math.PI * 2;
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+            return [x * 0.3 + 5, y * 0.3, (Math.random() - 0.5) * 1];
+        }
+    },
+    starlove: (i) => {
+        const stars = 5;
+        const star = Math.floor((i / PARTICLE_COUNT) * stars);
+        const angle = (star / stars) * Math.PI * 2;
+        const t = (i % (PARTICLE_COUNT / stars)) / (PARTICLE_COUNT / stars);
+        const r = t * 6;
+        const x = r * Math.cos(angle);
+        const y = r * Math.sin(angle);
+        // Connect stars with heart
+        if (i % 10 === 0) {
+            const heartT = Math.random() * Math.PI * 2;
+            const hx = 8 * Math.pow(Math.sin(heartT), 3);
+            const hy = 6.5 * Math.cos(heartT) - 2.5 * Math.cos(2 * heartT);
+            return [hx * 0.5, hy * 0.5, (Math.random() - 0.5) * 2];
+        }
+        return [x, y, (Math.random() - 0.5) * 1.5];
+    },
+    rose: (i) => {
+        const layers = 8;
+        const layer = Math.floor((i / PARTICLE_COUNT) * layers);
+        const t = (i % (PARTICLE_COUNT / layers)) / (PARTICLE_COUNT / layers) * Math.PI * 2;
+        const r = (layer + 1) * 1.2 + Math.sin(t * 3 + layer) * 0.5;
+        const x = r * Math.cos(t + layer * 0.3);
+        const y = r * Math.sin(t + layer * 0.3);
+        return [x * 0.8, y * 0.8, (layer - layers/2) * 0.5];
+    },
+    kiss: (i) => {
+        const t = Math.random() * Math.PI * 2;
+        const u = Math.random();
+        // Lip shape
+        const x = 6 * Math.cos(t) * (1 + Math.sin(t) * 0.3);
+        const y = 4 * Math.sin(t) * (1 + Math.cos(t) * 0.2);
+        return [x * u, y * u, (Math.random() - 0.5) * 1];
+    },
+    weddingring: (i) => {
+        const t = (i / PARTICLE_COUNT) * Math.PI * 2;
+        const r = 5;
+        const x = r * Math.cos(t);
+        const y = r * Math.sin(t);
+        // Diamond on ring
+        if (i % 20 === 0) {
+            return [x * 1.2, y * 1.2, (Math.random() - 0.5) * 0.5];
+        }
+        return [x, y, (Math.random() - 0.5) * 0.3];
+    }
+};
+
+const shapeKeys = Object.keys(shapes);
+let currentShapeIndex = 0;
+
+function morphTo(shapeKey) {
+    document.getElementById('shape-name').innerText = shapeKey;
+    const formula = shapes[shapeKey];
+    
+    // Update shape select dropdown
+    if (document.getElementById('shape-select')) {
+        document.getElementById('shape-select').value = shapeKey;
+    }
+    
+    // Pick a color based on shape
+    let r, g, b;
+    if (shapeKey === 'heart' || shapeKey === 'loveheart') { r=1; g=0.2; b=0.4; }
+    else if (shapeKey === 'flower') { r=1; g=0.8; b=0.2; }
+    else if (shapeKey === 'saturn') { r=0.5; g=0.8; b=1; }
+    else if (shapeKey === 'earth') { r=0.2; g=0.5; b=0.9; }
+    else if (shapeKey === 'jupiter') { r=0.9; g=0.7; b=0.5; }
+    else if (shapeKey === 'mars') { r=0.9; g=0.3; b=0.2; }
+    else if (shapeKey === 'neptune') { r=0.2; g=0.4; b=0.9; }
+    else if (shapeKey === 'venus') { r=1; g=0.7; b=0.3; }
+    else if (shapeKey === 'mercury') { r=0.8; g=0.6; b=0.5; }
+    else if (shapeKey === 'uranus') { r=0.3; g=0.8; b=0.9; }
+    else if (shapeKey === 'pluto') { r=0.7; g=0.5; b=0.4; }
+    else if (shapeKey === 'cube') { r=0.8; g=0.8; b=1; }
+    else if (shapeKey === 'torus') { r=0.6; g=1; b=0.8; }
+    else if (shapeKey === 'star') { r=1; g=1; b=0.3; }
+    else if (shapeKey === 'spiral') { r=0.8; g=0.3; b=1; }
+    else if (shapeKey === 'diamond') { r=0.3; g=0.9; b=1; }
+    else if (shapeKey === 'butterfly') { r=1; g=0.5; b=0.8; }
+    else if (shapeKey === 'dna') { r=0.2; g=1; b=0.5; }
+    else if (shapeKey === 'galaxy') { r=0.5; g=0.3; b=1; }
+    else if (shapeKey === 'pyramid') { r=1; g=0.6; b=0.2; }
+    else if (shapeKey === 'helix') { r=0.4; g=0.8; b=1; }
+    else if (shapeKey === 'crystal') { r=0.6; g=0.9; b=1; }
+    else if (shapeKey === 'crystalcluster') { r=0.4; g=0.7; b=1; }
+    else if (shapeKey === 'diamondcrystal') { r=0.8; g=0.9; b=1; }
+    else if (shapeKey === 'geode') { r=0.9; g=0.6; b=0.8; }
+    else if (shapeKey === 'prism') { r=0.5; g=0.8; b=1; }
+    else if (shapeKey === 'octahedron') { r=0.7; g=0.5; b=1; }
+    else if (shapeKey === 'icosahedron') { r=0.4; g=0.9; b=0.6; }
+    else if (shapeKey === 'dodecahedron') { r=1; g=0.4; b=0.7; }
+    else if (shapeKey === 'tree') { r=0.3; g=0.7; b=0.3; }
+    else if (shapeKey === 'snowflake') { r=0.8; g=0.9; b=1; }
+    else if (shapeKey === 'leaf') { r=0.4; g=0.8; b=0.3; }
+    else if (shapeKey === 'mandala') { r=1; g=0.7; b=0.4; }
+    else if (shapeKey === 'yinyang') { r=0.2; g=0.2; b=0.2; }
+    else if (shapeKey === 'infinity') { r=0.6; g=0.4; b=1; }
+    else if (shapeKey === 'comet') { r=0.9; g=0.9; b=0.5; }
+    else if (shapeKey === 'blackhole') { r=0.1; g=0.1; b=0.2; }
+    else if (shapeKey === 'constellation') { r=0.9; g=0.9; b=1; }
+    else if (shapeKey === 'arch') { r=0.7; g=0.6; b=0.5; }
+    else if (shapeKey === 'dome') { r=0.8; g=0.7; b=0.6; }
+    else if (shapeKey === 'bird') { r=0.8; g=0.6; b=0.3; }
+    else if (shapeKey === 'fish') { r=0.3; g=0.6; b=0.9; }
+    else if (shapeKey === 'peace') { r=0.5; g=0.5; b=0.5; }
+    else if (shapeKey === 'atom') { r=0.5; g=0.8; b=1; }
+    else if (shapeKey === 'doubleheart') { r=1; g=0.2; b=0.5; }
+    else if (shapeKey === 'heartstar') { r=1; g=0.4; b=0.6; }
+    else if (shapeKey === 'lovering') { r=1; g=0.3; b=0.5; }
+    else if (shapeKey === 'cupid') { r=1; g=0.5; b=0.7; }
+    else if (shapeKey === 'starlove') { r=1; g=0.6; b=0.8; }
+    else if (shapeKey === 'rose') { r=1; g=0.2; b=0.3; }
+    else if (shapeKey === 'kiss') { r=1; g=0.3; b=0.4; }
+    else if (shapeKey === 'weddingring') { r=0.9; g=0.9; b=1; }
+    else { r=1; g=1; b=1; }
+
+    const colorsArr = geometry.attributes.color.array;
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const [x, y, z] = formula(i);
+        const i3 = i * 3;
+        targetPositions[i3] = x;
+        targetPositions[i3 + 1] = y;
+        targetPositions[i3 + 2] = z;
+
+        // Color transition logic (simple linear set)
+        colorsArr[i3] = r + (Math.random() - 0.5) * 0.2;
+        colorsArr[i3+1] = g + (Math.random() - 0.5) * 0.2;
+        colorsArr[i3+2] = b + (Math.random() - 0.5) * 0.2;
+    }
+    geometry.attributes.color.needsUpdate = true;
+}
+
+// Initial Shape
+morphTo('sphere');
+
+
+/**
+ * 3. INTERACTION & ANIMATION LOOP
+ */
+let expansionFactor = 0;
+let rotationTargetX = 0;
+let rotationTargetY = 0;
+let isFist = false;
+let lastFistTime = 0;
+let lastBackgroundSwitchTime = 0;
+let lastFeatherSwitchTime = 0;
+
+// Animation Loop
+const clock = new THREE.Clock();
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    const delta = clock.getDelta();
+    const positionsArr = geometry.attributes.position.array;
+
+    // Enhanced smooth rotation interpolation
+    particles.rotation.y += (rotationTargetX - particles.rotation.y) * 0.15; // Increased from 0.1
+    particles.rotation.x += (rotationTargetY - particles.rotation.x) * 0.15;
+    
+    // Add momentum for smoother feel
+    const rotationSpeed = Math.abs(rotationTargetX - particles.rotation.y) + Math.abs(rotationTargetY - particles.rotation.x);
+    if (rotationSpeed > 0.1) {
+        particles.rotation.y += (rotationTargetX - particles.rotation.y) * 0.2;
+        particles.rotation.x += (rotationTargetY - particles.rotation.x) * 0.2;
+    }
+
+    // Particle Movement Logic
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const i3 = i * 3;
+        
+        let tx = targetPositions[i3];
+        let ty = targetPositions[i3 + 1];
+        let tz = targetPositions[i3 + 2];
+
+        // Expansion Logic (Explosion)
+        if (expansionFactor > 0.1) {
+            tx *= (1 + expansionFactor * 2);
+            ty *= (1 + expansionFactor * 2);
+            tz *= (1 + expansionFactor * 2);
+        }
+
+        // Lerp current position to target
+        positionsArr[i3] += (tx - positionsArr[i3]) * 0.05;
+        positionsArr[i3 + 1] += (ty - positionsArr[i3 + 1]) * 0.05;
+        positionsArr[i3 + 2] += (tz - positionsArr[i3 + 2]) * 0.05;
+
+        // Add subtle noise movement
+        positionsArr[i3] += Math.sin(clock.elapsedTime + i) * 0.02;
+    }
+
+    geometry.attributes.position.needsUpdate = true;
+    
+    // Subtle pulsing glow effect
+    const pulse = Math.sin(clock.elapsedTime * 0.5) * 0.05 + 0.95;
+    material.opacity = pulse;
+    
+    renderer.render(scene, camera);
+}
+animate();
+
+
+/**
+ * 4. MEDIAPIPE HAND TRACKING
+ */
+const videoElement = document.getElementById('video-input');
+
+function onResults(results) {
+    document.getElementById('loading').classList.add('hidden');
+
+    // Check for two hands clapping
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length >= 2) {
+        const hand1 = results.multiHandLandmarks[0];
+        const hand2 = results.multiHandLandmarks[1];
+        detectTwoHandClap(hand1, hand2);
+    }
+
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        
+        // 1. Enhanced Rotation Control - More responsive
+        const x = (landmarks[8].x - 0.5) * 2;
+        const y = (landmarks[8].y - 0.5) * 2;
+        
+        // Smoother rotation with better mapping
+        rotationTargetX = x * 3; // Increased sensitivity
+        rotationTargetY = y * 3;
+        
+        // 2. Expansion Control
+        const thumbTip = landmarks[4];
+        const indexTip = landmarks[8];
+        const distance = Math.sqrt(
+            Math.pow(thumbTip.x - indexTip.x, 2) + 
+            Math.pow(thumbTip.y - indexTip.y, 2)
+        );
+
+        if (distance < 0.05) {
+            expansionFactor = THREE.MathUtils.lerp(expansionFactor, 1.5, 0.1);
+        } else {
+            expansionFactor = THREE.MathUtils.lerp(expansionFactor, 0, 0.1);
+        }
+
+        // 3. Gesture Detection (Fist for shape switch)
+        const isFingersClosed = 
+            landmarks[8].y > landmarks[6].y && 
+            landmarks[12].y > landmarks[10].y && 
+            landmarks[16].y > landmarks[14].y && 
+            landmarks[20].y > landmarks[18].y;
+
+        const now = Date.now();
+        if (isFingersClosed) {
+            if (!isFist && now - lastFistTime > 1000) {
+                isFist = true;
+                lastFistTime = now;
+                currentShapeIndex = (currentShapeIndex + 1) % shapeKeys.length;
+                morphTo(shapeKeys[currentShapeIndex]);
+            }
+            // Background switching with long hold
+            if (isFist && now - lastFistTime > 2000 && now - lastBackgroundSwitchTime > 2500) {
+                lastBackgroundSwitchTime = now;
+                currentBackgroundIndex = (currentBackgroundIndex + 1) % backgroundKeys.length;
+                setBackground(backgroundKeys[currentBackgroundIndex]);
+            }
+        } else {
+            isFist = false;
+        }
+        
+        // 4. Feather texture switching with two-finger gesture
+        const middleTip = landmarks[12];
+        const ringTip = landmarks[16];
+        const twoFingerDistance = Math.sqrt(
+            Math.pow(middleTip.x - ringTip.x, 2) + 
+            Math.pow(middleTip.y - ringTip.y, 2)
+        );
+        
+        if (twoFingerDistance < 0.03 && landmarks[12].y < landmarks[10].y && landmarks[16].y < landmarks[14].y) {
+            const featherTypes = ['default', 'soft', 'sharp', 'glow', 'sparkle', 'radiant', 'ethereal'];
+            const currentFeatherIndex = featherTypes.indexOf(currentFeatherType);
+            if (now - lastFeatherSwitchTime > 1500) {
+                lastFeatherSwitchTime = now;
+                const nextFeather = featherTypes[(currentFeatherIndex + 1) % featherTypes.length];
+                updateFeatherTexture(nextFeather);
+            }
+        }
+    }
+}
+
+const hands = new Hands({locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+}});
+
+hands.setOptions({
+    maxNumHands: 2, // Changed from 1 to 2 for two-hand clap detection
+    modelComplexity: 1,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5
+});
+
+hands.onResults(onResults);
+
+const cameraUtils = new Camera(videoElement, {
+    onFrame: async () => {
+        await hands.send({image: videoElement});
+    },
+    width: 640,
+    height: 480
+});
+
+cameraUtils.start();
+
+// Window Resize Handling
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Menu Toggle
+document.getElementById('menu-toggle').addEventListener('click', () => {
+    const menu = document.getElementById('menu');
+    menu.classList.toggle('hidden');
+});
+
+// Enhanced Feather Controls
+function updateFeatherIntensity(value) {
+    customFeatherSettings.intensity = parseFloat(value);
+    updateFeatherTexture(currentFeatherType);
+    if (document.getElementById('intensity-value')) {
+        document.getElementById('intensity-value').textContent = value;
+    }
+}
+
+function updateParticleSize(value) {
+    PARTICLE_SIZE = parseFloat(value);
+    material.size = PARTICLE_SIZE;
+    material.needsUpdate = true;
+    if (document.getElementById('size-value')) {
+        document.getElementById('size-value').textContent = value;
+    }
+}
+
+function switchShape() {
+    currentShapeIndex = (currentShapeIndex + 1) % shapeKeys.length;
+    morphTo(shapeKeys[currentShapeIndex]);
+}
+
+// Premium Control Functions
+function resetToDefaults() {
+    // Reset to default settings
+    currentFeatherType = 'glow';
+    customFeatherSettings.intensity = 1.0;
+    customFeatherSettings.softness = 0.5;
+    PARTICLE_SIZE = 0.15;
+    
+    // Update UI
+    if (document.getElementById('feather-intensity')) {
+        document.getElementById('feather-intensity').value = 1.0;
+        document.getElementById('intensity-value').textContent = '1.0';
+    }
+    if (document.getElementById('particle-size')) {
+        document.getElementById('particle-size').value = 0.15;
+        document.getElementById('size-value').textContent = '0.15';
+    }
+    
+    // Update materials
+    updateFeatherTexture('glow');
+    material.size = PARTICLE_SIZE;
+    material.needsUpdate = true;
+    
+    // Reset shape
+    morphTo('sphere');
+    
+    // Reset background
+    setBackground('space');
+    
+    // Update selects
+    if (document.getElementById('background-select')) {
+        document.getElementById('background-select').value = 'space';
+    }
+    if (document.getElementById('shape-select')) {
+        document.getElementById('shape-select').value = 'sphere';
+    }
+}
+
+function applyPremiumPreset() {
+    updateFeatherTexture('radiant');
+    customFeatherSettings.intensity = 1.2;
+    if (document.getElementById('feather-intensity')) {
+        document.getElementById('feather-intensity').value = 1.2;
+        document.getElementById('intensity-value').textContent = '1.2';
+    }
+    setBackground('starlove');
+    if (document.getElementById('background-select')) {
+        document.getElementById('background-select').value = 'starlove';
+    }
+}
+
+function applyLovePreset() {
+    updateFeatherTexture('ethereal');
+    customFeatherSettings.intensity = 1.1;
+    if (document.getElementById('feather-intensity')) {
+        document.getElementById('feather-intensity').value = 1.1;
+        document.getElementById('intensity-value').textContent = '1.1';
+    }
+    setBackground('valentine');
+    if (document.getElementById('background-select')) {
+        document.getElementById('background-select').value = 'valentine';
+    }
+    morphTo('doubleheart');
+    if (document.getElementById('shape-select')) {
+        document.getElementById('shape-select').value = 'doubleheart';
+    }
+}
+
+function updateActiveFeatherButton() {
+    document.querySelectorAll('.feather-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.feather === currentFeatherType) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+function toggleSection(element) {
+    const section = element.parentElement;
+    section.classList.toggle('active');
+    const arrow = element.textContent.includes('▼') ? '▲' : '▼';
+    element.textContent = element.textContent.replace(/[▼▲]/, arrow);
+}
+
+// Initialize select dropdowns
+function initializeSelects() {
+    const shapeSelect = document.getElementById('shape-select');
+    if (shapeSelect) {
+        // Clear existing options except first
+        while (shapeSelect.options.length > 1) {
+            shapeSelect.remove(1);
+        }
+        shapeKeys.forEach(key => {
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = key.charAt(0).toUpperCase() + key.slice(1);
+            shapeSelect.appendChild(option);
+        });
+    }
+    
+    const bgSelect = document.getElementById('background-select');
+    if (bgSelect) {
+        backgroundKeys.forEach(key => {
+            if (!bgSelect.querySelector(`option[value="${key}"]`)) {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = key.charAt(0).toUpperCase() + key.slice(1);
+                bgSelect.appendChild(option);
+            }
+        });
+    }
+}
+
+// Call on page load
+window.addEventListener('load', () => {
+    initializeSelects();
+    updateActiveFeatherButton();
+});
+
+</script>
+</body>
+</html>
